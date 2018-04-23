@@ -1,19 +1,13 @@
 import easyparse as ep
 import easyparse.tokenizers as epts
 
-def eq(value):
-    return lambda x: x == value
-
-def concatenate(list_object):
-    return "".join(list_object)
-
 class WordTokenizer(ep.Tokenizer):
     def __init__(self, extra_chars=()):
         self.extra_chars = extra_chars
     def tokenize(self, view):
         buffer = view.consume_while(lambda x: x.isalnum() or x in self.extra_chars)
         if buffer:
-            return ep.Token("WORD", concatenate(buffer))
+            return ep.Token("WORD", "".join(buffer))
 
 class PropertyTokenizer(ep.Tokenizer):
     def tokenize(self, view):
@@ -62,7 +56,7 @@ class RPP(object):
         rpp_lexer_stage1 = ep.Lexer([
             WordTokenizer(extra_chars=("_","-",".", "/","\"", "{", "}")),
             epts.WhitespaceTokenizer(auto_discard=True),
-            epts.SingleTokenizer("NEWLINE", eq("\n"), lambda x:None),
+            epts.SingleTokenizer("NEWLINE", lambda x: "\n" == x, lambda x: None),
             ] + [ epts.CharTokenizer(char) for char in ["<", ">"] ])
 
         rpp_lexer_stage2 = ep.Lexer([
