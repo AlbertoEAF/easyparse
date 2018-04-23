@@ -4,9 +4,6 @@ import easyparse.tokenizers as epts
 def eq(value):
     return lambda x: x == value
 
-def neq(value):
-    return lambda x: x != value
-
 def concatenate(list_object):
     return "".join(list_object)
 
@@ -25,24 +22,9 @@ class PropertyTokenizer(ep.Tokenizer):
             return ep.Token("Property", [ token.content for token in buffer ])
 
 
-
-rpp_lexer = ep.Lexer([
-    WordTokenizer(extra_chars=("_","-",".", "/","\"", "{", "}")),
-    epts.WhitespaceTokenizer(auto_discard=True),
-    epts.SingleTokenizer("NEWLINE", eq("\n"), lambda x:None),
-    ] + [ epts.CharTokenizer(char) for char in ["<", ">"] ])
-
-rpp_lexer_stage2 = ep.Lexer([
-    PropertyTokenizer(),
-    epts.DiscardTokens(lambda token: token.TYPE == "NEWLINE"),
-    epts.IdentityTokenizer()])
-
-
 class ReaperNode(object):
     def __init__(self, node):
         node = ep.DeepTreeNode(node)
-
-        parse_property_token = lambda token: { token.content[0] : token.content[1:] }
 
         if node.properties:
             header = node.properties[0].content
@@ -63,7 +45,6 @@ def filter_tree(tree_node, filter_f):
 
     if filter_f(tree_node):
         nodes.append(tree_node)
-
     for child in tree_node.children:
         nodes.extend(filter_tree(child, filter_f))
 
@@ -73,23 +54,45 @@ def filter_tree(tree_node, filter_f):
 class RPP(object):
     def __init__(self, rpp_filepath):
         self.filepath = rpp_filepath
-        self.rpp_content = open(self.filepath).read()
+        self.rpp_raw = open(self.filepath).read()
+
+        self.tree, self.rpp = self._parse(self.rpp_raw)
+
+    def _parse(self, raw_content):
+        rpp_lexer_stage1 = ep.Lexer([
+            WordTokenizer(extra_chars=("_","-",".", "/","\"", "{", "}")),
+            epts.WhitespaceTokenizer(auto_discard=True),
+            epts.SingleTokenizer("NEWLINE", eq("\n"), lambda x:None),
+            ] + [ epts.CharTokenizer(char) for char in ["<", ">"] ])
+
+        rpp_lexer_stage2 = ep.Lexer([
+            PropertyTokenizer(),
+            epts.DiscardTokens(lambda token: token.TYPE == "NEWLINE"),
+            epts.IdentityTokenizer()])
+
+        tokens = rpp_lexer_stage1.parse(raw_content) # acts as tokenizer
+        tokens = rpp_lexer_stage2.parse(tokens)      # parses the tokens
+
+        tree_maker = ep.TreeMaker(ep.DeepTreeNode, lambda x: x.TYPE=="<", lambda x: x.TYPE==">")
+
+        tree = tree_maker.parse(tokens).children[0]
+        rpp = ReaperNode(tree)
+
+        tree.pretty_print()
+        print("\n"*5)
+        return (tree, rpp)
 
 
 
-phrase = open(r"C:\Users\AlbertoEAF\Desktop\teste\\teste.rpp").read()
-tokens = rpp_lexer.parse(phrase)
-tokens2 = rpp_lexer_stage2.parse(tokens)
-tree_maker = ep.TreeMaker(ep.DeepTreeNode, lambda x: x.TYPE=="<", lambda x: x.TYPE==">")
+if __name__ == "__main__":
+    rpp = RPP(r"C:\Users\AlbertoEAF\Desktop\teste\teste.rpp")
 
-print("\n"*20)
-print(phrase)
-tree = tree_maker.parse(tokens2).children[0]
-print("\n"*10)
-tree.pretty_print()
+    tracks = filter_tree(rpp.rpp, lambda x: x.name == "TRACK")
 
-rpp = ReaperNode(tree)
-
-tracks = filter_tree(rpp, lambda x: x.name == "TRACK")
-
-print(tracks, len(tracks))
+    print("RPP:", rpp.filepath, "\n")
+    for track in tracks:
+        track_items = track.children
+        track_items = [ (item.name, item.properties["NAME"][0], item.children[0].properties["FILE"][0]) for item in track_items ]
+        print(f""" TRACK {track.properties["NAME"][0]}""")
+        for item in (track_items):
+            print("  ", " ".join(item))
