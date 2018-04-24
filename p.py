@@ -77,9 +77,8 @@ class RPP(object):
         return (tree, rpp)
 
 
-
-if __name__ == "__main__":
-    rpp = RPP(r"C:\Users\AlbertoEAF\Desktop\teste\teste.rpp")
+def parse_reaper_file(filepath):
+    rpp = RPP(filepath)
 
     tracks = filter_tree(rpp.rpp, lambda x: x.name == "TRACK")
 
@@ -90,3 +89,54 @@ if __name__ == "__main__":
         print(f""" TRACK {track.properties["NAME"][0]}""")
         for item in (track_items):
             print("  ", " ".join(item))
+
+import lark
+from lark import Lark
+print(dir(lark))
+def lark_parse_rpp(filepath):
+    s = open(filepath).read()
+
+    print(s)
+
+    grammar = r"""
+        start: node+
+             | EMPTY_LINE
+
+
+        EMPTY_LINE: _WS? _NEWLINE _WS?
+
+        node: _WS? "<" HEADER (_NEWLINE|_WS)+ (node|property)+ ">" _NEWLINE+
+
+        property: WORD (_WS|NUM|WORD)? _NEWLINE+
+
+        HEADER: LETTER+
+
+        WORD:  (LETTER|"0".."9"|"_"|"."|"-"|"\\"|"/"|"\""|":")+
+        NUM.9: INT
+        _NEWLINE: "\n"
+        _WS.10: (" " | "\t" )+
+        %import common.ESCAPED_STRING
+        %import common.LETTER
+        %import common.DIGIT
+        %import common.INT
+        %ignore _WS
+        %ignore _NEWLINE
+    """
+
+    s = """
+    <reaper
+
+    value 2
+    >
+    """
+    p = Lark(grammar).parse(s)
+
+    print(p)
+    print( p.pretty() )
+
+if __name__ == "__main__":
+    rpp_path = r"C:\Users\AlbertoEAF\Desktop\teste\teste.rpp"
+    parse_reaper_file(rpp_path)
+
+    lark_parse_rpp(rpp_path)
+
